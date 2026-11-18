@@ -1,0 +1,19 @@
+{
+  "name": "vidx",
+  "version": "2.1.0",
+  "private": true,
+  "description": "A personal video and stream fetcher/downloader inspired by VideoFetch.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "mkdir -p ./bin && (curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./bin/yt-dlp || true) && chmod +x ./bin/yt-dlp || true",
+    "postinstall": "mkdir -p ./bin && (curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./bin/yt-dlp || true) && chmod +x ./bin/yt-dlp || true",
+    "setup:ytdlp": "mkdir -p ./bin && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./bin/yt-dlp && chmod +x ./bin/yt-dlp",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
