@@ -1,60 +1,53 @@
-const MAX_HTML_BYTES = 1_000_000;
-const MAX_REDIRECTS = 4;
-const TIMEOUT_MS = 12000;
+import { URL } from "node:url";
 
-export function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff"
-    }
-  });
+const TIMEOUT_MS = 8000;
+const MAX_REDIRECTS = 5;
+const MAX_HTML_BYTES = 1024 * 1024; // 1 MB cap to protect memory
+
+export function isPrivateIp(hostname) {
+  const lower = hostname.toLowerCase();
+  if (lower === "localhost" || lower.endsWith(".local") || lower.endsWith(".internal")) {
+    return true;
+  }
+  const ipv4 = lower.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [, a, b, c, d] = ipv4.map(Number);
+    if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+    if (a === 0) return true;
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a >= 224) return true;
+    return false;
+  }
+  if (lower.startsWith("[") && lower.endsWith("]")) {
+    const v6 = lower.slice(1, -1);
+    if (v6 === "::1" || v6 === "::") return true;
+    if (v6.startsWith("fe80:") || v6.startsWith("fc") || v6.startsWith("fd")) return true;
+  }
+  return false;
 }
 
-export function isPrivateIPv4(host) {
-  const parts = host.split(".").map(Number);
-  if (parts.length !== 4 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return false;
-  const [a, b] = parts;
-  return a === 0 || a === 10 || a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    a >= 224;
-}
-
-export function validateUrl(raw) {
-  let clean = (raw || "").trim();
-  const httpMatch = clean.match(/https?:\/\/[^\s"'<>]+/i);
-  if (httpMatch) {
-    clean = httpMatch[0];
-  } else if (!/^https?:\/\//i.test(clean)) {
-    clean = "https://" + clean;
+export function validateUrl(rawUrl) {
+  if (typeof rawUrl !== "string" || !rawUrl.trim()) {
+    throw new Error("Invalid input: URL must be a non-empty string.");
   }
-
-  let url;
-  try { url = new URL(clean); } catch { throw new Error("Please enter a valid URL."); }
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("Only HTTP/HTTPS URLs are allowed.");
+  let parsed;
+  try {
+    parsed = new URL(rawUrl.trim());
+  } catch {
+    throw new Error("Invalid URL format. Include http:// or https://");
   }
-  if (url.username || url.password) {
-    throw new Error("User credentials in URLs are not permitted.");
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Protocol not supported. Only HTTP and HTTPS are allowed.");
   }
-  const host = url.hostname.toLowerCase();
-  const isIPv6Blocked = host === "[::1]" || host === "[::]" ||
-    host.startsWith("[::ffff:") || host.startsWith("[fc") ||
-    host.startsWith("[fd") || host.startsWith("[fe80");
-
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
-      host.endsWith(".internal") || host === "0.0.0.0" || isIPv6Blocked) {
-    throw new Error("Local/private network addresses are blocked for security.");
-  }
-  if (isPrivateIPv4(host)) {
+  if (isPrivateIp(parsed.hostname)) {
     throw new Error("Private/local network addresses are not allowed.");
   }
-  return url;
+  return parsed;
 }
 
 export function getOptimalReferer(targetUrl) {
@@ -201,7 +194,7 @@ export function extractVideosFromHtml(html, pageUrl) {
     } catch {}
   }
 
-  // 2. <video> elements (src, data-src, data-url)
+  // 2. <video> elements
   for (const m of html.matchAll(/<video\b[^>]*(?:\bsrc|data-src|data-url)\s*=\s*(?:["']([^"']+)["']|([^\s>]+))[^>]*>/gi)) {
     add(m[1] || m[2], "HTML5 video element");
   }
@@ -219,7 +212,7 @@ export function extractVideosFromHtml(html, pageUrl) {
     add(m[1], "OpenGraph video metadata", "Web Video");
   }
 
-  // 5. Unescape JSON slashes (\/) and find literal media URLs
+  // 5. Page scripts
   const unescaped = html.replace(/\\\//g, "/");
   for (const m of unescaped.matchAll(/["']([^"'<>\\\s]{5,2048}\.(?:mp4|m4v|mov|webm|ogv|m3u8|mpd)(?:\?[^"'<>\\\s]*)?)["']/gi)) {
     add(m[1], "Page script/stream link");
@@ -370,4 +363,4 @@ export async function analyzeUrl(raw) {
       ? `Detected ${candidates.length} video/media stream link(s).`
       : "No direct video links found in page HTML. Media may be dynamically generated or protected."
   };
-}
+                                     }
