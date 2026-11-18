@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Personal Video & Stream Fetcher - Download video from web and social platforms.">
+  <title>VidX · Universal Video Downloader</title>
+  <link rel="stylesheet" href="/style.v4.css">
+  <style>
+    /* Critical Inline Button Styles for Instant Display */
+    .item-actions {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 6px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      margin-top: 8px !important;
+    }
+    .item-actions .btn-act {
+      min-width: 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+      padding: 7px 4px !important;
+      min-height: 34px !important;
+      border-radius: 6px !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      font-family: inherit !important;
+      text-decoration: none !important;
+      cursor: pointer !important;
+      white-space: nowrap !important;
+      box-sizing: border-box !important;
+      line-height: 1.2 !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+    }
+    .item-actions .btn-act.primary {
+      flex: 1.15 1 0 !important;
+      background: linear-gradient(135deg, #7c6cf0, #5647db) !important;
+      border: 1px solid #9081f8 !important;
+      color: #ffffff !important;
+      box-shadow: 0 2px 8px rgba(124, 108, 240, 0.35) !important;
+    }
+    .item-actions .btn-act.secondary {
+      flex: 1 1 0 !important;
+      background: #142844 !important;
+      border: 1px solid #28517e !important;
+      color: #4ee0ba !important;
+    }
+    .item-actions .btn-act.copy-btn {
+      flex: 0.95 1 0 !important;
+      background: #17233c !important;
+      border: 1px solid #2e3e5e !important;
+      color: #e2e8f5 !important;
+    }
+    @media (max-width: 640px) {
+      .item-actions {
+        gap: 5px !important;
+      }
+      .item-actions .btn-act {
+        min-height: 32px !important;
+        font-size: 10.5px !important;
+        padding: 6px 3px !important;
+      }
+    }
+  </style>
+  <script src="/hls.min.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <div class="brand-wrap">
+        <a class="brand" href="/">Vid<span>Fetch</span></a>
+        <span class="tag">PERSONAL VIDEO FETCHER</span>
+        <span class="ver-badge" style="background:#22c55e22;color:#22c55e;border:1px solid #22c55e44;padding:2px 7px;border-radius:10px;font-size:10.5px;font-weight:700;">v4.0</span>
+      </div>
+      <div class="creator-badge" title="Developer & Creator">
+        <span class="badge-icon">👑</span>
+        <span>Made by <strong>Nishad Xaman Orkon</strong></span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="eyebrow"><i></i> UNIVERSAL VIDEO & STREAM DETECTOR</div>
+        <h1>Find & Download<br><span>Any Video or Stream</span></h1>
+        <p class="sub">Paste any video URL from TikTok, Facebook, YouTube, X (Twitter), Reddit, or general websites. VidX automatically extracts all available formats and resolutions.</p>
+        
+        <form id="form" class="search-form" novalidate>
+          <div class="input-wrap">
+            <span class="icon">🔗</span>
+            <input id="url" type="text" inputmode="url" placeholder="Paste video URL (TikTok, Facebook, YouTube, Reels...)" autocomplete="off" spellcheck="false" required autofocus>
+            <button id="clearBtn" type="button" class="btn-clear-url" title="Clear input link" hidden>✕ Clear</button>
+            <button id="pasteBtn" type="button" class="btn-paste" title="Paste from clipboard">📋 Paste</button>
+          </div>
+          <button id="submit" type="submit" class="btn-fetch">
+            <span>Fetch Video</span>
+            <b>→</b>
+          </button>
+        </form>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+
+        <div class="badges">
+          <span>MP4 / WebM</span>
+          <span>TikTok & Facebook</span>
+          <span>YouTube & X</span>
+          <span>HLS (M3U8)</span>
+          <span>DASH (MPD)</span>
+          <span>In-Browser Preview</span>
+        </div>
+
+        <!-- Proxy / VPN Controls with ON/OFF Switch -->
+        <div class="proxy-wrapper">
+          <div class="proxy-bar">
+            <button id="proxyToggleSwitch" type="button" class="proxy-switch-btn off" title="Click to toggle Proxy ON or OFF">
+              <span class="switch-indicator"></span>
+              <span id="proxySwitchText" class="switch-text">Proxy: <strong>OFF</strong></span>
+            </button>
+            <button id="toggleProxyBtn" type="button" class="btn-proxy-toggle">
+              <span>⚙ Proxy Config</span>
+            </button>
+          </div>
+
+          <div id="proxyPanel" class="proxy-panel" hidden>
+            <div class="proxy-panel-header">
+              <div class="proxy-panel-title">
+                <h4>Proxy Configuration & Live Tester</h4>
+                <p>Configure a SOCKS5/HTTP proxy or VPN port to bypass ISP & geo-blocks</p>
+              </div>
+              <span id="proxyStatusPill" class="proxy-status-pill idle">No Proxy</span>
+            </div>
+
+            <!-- Smart Quick Paste Box -->
+            <div class="proxy-quick-wrap">
+              <label for="quickProxyInput">⚡ Smart Import (Paste any format):</label>
+              <div class="quick-input-group">
+                <input id="quickProxyInput" type="text" placeholder="e.g. 127.0.0.1:10808 or socks5://user:pass@host:port or ip:port:user:pass" autocomplete="off" spellcheck="false">
+                <button id="quickProxyPasteBtn" type="button" class="btn-quick-paste" title="Paste from clipboard">📋 Paste</button>
+              </div>
+            </div>
+
+            <div class="proxy-form-grid">
+              <div class="proxy-field proxy-proto-field">
+                <label for="proxyProtocol">Protocol</label>
+                <select id="proxyProtocol">
+                  <option value="socks5" selected>SOCKS5 (Remote DNS)</option>
+                  <option value="http">HTTP</option>
+                  <option value="https">HTTPS</option>
+                  <option value="socks4">SOCKS4</option>
+                </select>
+              </div>
+
+              <div class="proxy-field proxy-host-field">
+                <label for="proxyHost">Host / IP</label>
+                <input id="proxyHost" type="text" placeholder="127.0.0.1 or domain">
+              </div>
+
+              <div class="proxy-field proxy-port-field">
+                <label for="proxyPort">Port</label>
+                <input id="proxyPort" type="number" placeholder="10808" min="1" max="65535">
+              </div>
+            </div>
+
+            <div class="proxy-auth-grid">
+              <div class="proxy-field">
+                <label for="proxyUser">Username (Optional)</label>
+                <input id="proxyUser" type="text" placeholder="Optional username">
+              </div>
+              <div class="proxy-field">
+                <label for="proxyPass">Password (Optional)</label>
+                <input id="proxyPass" type="password" placeholder="Optional password">
+              </div>
+            </div>
+
+            <div class="proxy-actions">
+              <button id="checkProxyBtn" type="button" class="btn-check-proxy">
+                <span>⚡ Test & Save Proxy</span>
+              </button>
+              <button id="clearProxyBtn" type="button" class="btn-remove-proxy">Remove Proxy</button>
+            </div>
+
+            <div id="proxyCheckStatus" class="proxy-check-status" hidden></div>
+
+            <div class="proxy-presets">
+              <span class="preset-label">Quick VPN Presets:</span>
+              <button type="button" class="btn-preset" data-proto="socks5" data-host="127.0.0.1" data-port="10808">v2ray / Xray (10808)</button>
+              <button type="button" class="btn-preset" data-proto="http" data-host="127.0.0.1" data-port="40000">WARP (40000)</button>
+              <button type="button" class="btn-preset" data-proto="http" data-host="127.0.0.1" data-port="7890">Clash (7890)</button>
+              <button type="button" class="btn-preset" data-proto="http" data-host="127.0.0.1" data-port="8080">Psiphon (8080)</button>
+              <button type="button" class="btn-preset" data-proto="socks5" data-host="127.0.0.1" data-port="2080">Sing-box (2080)</button>
+              <button type="button" class="btn-preset" data-proto="socks5" data-host="127.0.0.1" data-port="1080">Shadowsocks (1080)</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="results" class="results" hidden>
+        <div class="result-head">
+          <div class="media-header">
+            <div id="thumbWrap" class="thumb-wrap" hidden>
+              <img id="videoThumb" src="" alt="Thumbnail">
+            </div>
+            <div class="meta-wrap">
+              <div class="eyebrow">DETECTED MEDIA</div>
+              <h2 id="pageTitle">Detected Videos</h2>
+              <p id="note" class="note"></p>
+            </div>
+          </div>
+          <span id="count" class="count-badge"></span>
+        </div>
+
+        <!-- Media Category Tabs (Separates Videos, Images, Audio) -->
+        <div class="media-tabs" id="mediaTabs" hidden>
+          <button type="button" class="tab-btn active" data-filter="all">
+            <span>🌐 All Media</span>
+            <span class="tab-count" id="countAll">0</span>
+          </button>
+          <button type="button" class="tab-btn" data-filter="video">
+            <span>🎬 Videos (MP4)</span>
+            <span class="tab-count" id="countVideo">0</span>
+          </button>
+          <button type="button" class="tab-btn" data-filter="image">
+            <span>🖼️ Images (JPG)</span>
+            <span class="tab-count" id="countImage">0</span>
+          </button>
+          <button type="button" class="tab-btn" data-filter="audio">
+            <span>🎵 Audio (MP3)</span>
+            <span class="tab-count" id="countAudio">0</span>
+          </button>
+        </div>
+
+        <div id="list" class="list"></div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="creator-card">
+        <div class="creator-sparkle">✨</div>
+        <div class="creator-text">
+          <p class="credit-title">Made by <span class="highlight">Nishad Xaman Orkon</span></p>
+          <p class="credit-sub">VidX Universal Edition · High-Speed Universal Video & Stream Downloader</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- In-Browser Video Player Modal -->
+  <div id="playerModal" class="modal" style="display: none !important;" hidden>
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Video Preview</h3>
+        <button id="closeModal" class="btn-close" aria-label="Close">✕</button>
+      </div>
+      <div id="playerError" class="player-error" hidden></div>
+      <div class="video-container">
+        <video id="previewPlayer" controls playsinline></video>
+      </div>
+      <div class="modal-footer">
+        <a id="modalDownloadBtn" class="btn-act primary" href="#" download>⬇ Download Video</a>
+        <a id="modalExternalBtn" class="btn-act secondary" href="#" target="_blank" rel="noopener noreferrer">↗ Open Direct Link</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.v4.js"></script>
+  <script>
+    // Critical inline override: guarantees createCandidateItem renders 3 distinct buttons even if external scripts are cached
+    window.createCandidateItem = function(item, mainTitle) {
+      const card = document.createElement("article");
+      card.className = "item-card";
+
+      const category = typeof getCandidateCategory === "function" ? getCandidateCategory(item) : (item.type || "video");
+      const isImage = category === "image";
+      const isAudio = category === "audio";
+
+      const contentWrap = document.createElement("div");
+      contentWrap.className = "card-content";
+
+      if (isImage && item.url) {
+        const thumbImg = document.createElement("img");
+        thumbImg.className = "item-card-thumb";
+        thumbImg.src = item.url;
+        thumbImg.alt = "Thumbnail";
+        thumbImg.loading = "lazy";
+        thumbImg.onerror = () => { thumbImg.style.display = "none"; };
+        contentWrap.append(thumbImg);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "item-meta";
+
+      const pills = document.createElement("div");
+      pills.className = "item-pills";
+
+      const typePill = document.createElement("span");
+      typePill.className = "pill-type " + (item.type || (isImage ? "image" : isAudio ? "audio" : "video"));
+      typePill.textContent = (isImage ? "🖼️ " + (item.type || "IMAGE") : isAudio ? "🎵 AUDIO" : "🎬 " + (item.type || "VIDEO")).toUpperCase();
+      pills.append(typePill);
+
+      if (item.quality) {
+        const qualityPill = document.createElement("span");
+        qualityPill.className = "pill-quality";
+        qualityPill.textContent = item.quality;
+        pills.append(qualityPill);
+      }
+
+      const sizePill = document.createElement("span");
+      sizePill.className = "pill-size";
+      sizePill.textContent = item.size ? ("📦 " + item.size) : "📦 Stream";
+      pills.append(sizePill);
+
+      const linkText = document.createElement("span");
+      linkText.className = "item-link";
+      linkText.textContent = item.url;
+      linkText.title = item.url;
+
+      const sourceText = document.createElement("div");
+      sourceText.className = "item-source";
+      sourceText.textContent = item.source || "Detected Stream";
+
+      meta.append(pills, linkText, sourceText);
+      contentWrap.append(meta);
+
+      // Actions row (3 buttons: Download, Preview, Copy)
+      const actions = document.createElement("div");
+      actions.className = "item-actions";
+
+      // 1. Download Button
+      const downloadLink = document.createElement("a");
+      downloadLink.className = "btn-act primary";
+      downloadLink.href = typeof getDownloadUrl === "function" ? getDownloadUrl(item, mainTitle) : ("/api/download?url=" + encodeURIComponent(item.url || ""));
+      const ext = isImage ? ".jpg" : isAudio ? ".mp3" : ".mp4";
+      downloadLink.setAttribute("download", ((mainTitle || (isImage ? "image" : isAudio ? "audio" : "video")).replace(/[\\/:*?"<>|]/g, "_").slice(0, 50)) + ext);
+      downloadLink.textContent = "⬇ Download";
+      actions.append(downloadLink);
+
+      // 2. Preview Button
+      if (isImage) {
+        const viewImgBtn = document.createElement("a");
+        viewImgBtn.className = "btn-act secondary";
+        viewImgBtn.href = item.url;
+        viewImgBtn.target = "_blank";
+        viewImgBtn.rel = "noopener noreferrer";
+        viewImgBtn.textContent = "👁 View";
+        actions.append(viewImgBtn);
+      } else {
+        const previewBtn = document.createElement("button");
+        previewBtn.type = "button";
+        previewBtn.className = "btn-act secondary";
+        previewBtn.textContent = isAudio ? "▶ Play" : "▶ Preview";
+        previewBtn.addEventListener("click", () => {
+          if (typeof playVideo === "function") playVideo(item, item.type, mainTitle);
+        });
+        actions.append(previewBtn);
+      }
+
+      // 3. Copy Button
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "btn-act copy-btn";
+      copyBtn.textContent = "📋 Copy";
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(item.url);
+          copyBtn.textContent = "✓ Copied";
+          setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 2000);
+        } catch {
+          copyBtn.textContent = "Error";
+        }
+      });
+      actions.append(copyBtn);
+
+      card.append(contentWrap, actions);
+      return card;
+    };
+  </script>
+</body>
+</html>
