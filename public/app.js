@@ -73,15 +73,10 @@ function showStatus(message, isError = false) {
 function extractUrl(rawText) {
   if (!rawText || typeof rawText !== "string") return "";
   const text = rawText.trim();
-
-  // 1. Try to find an explicit http/https URL within the text
   const httpMatch = text.match(/https?:\/\/[^\s"'<>]+/i);
   if (httpMatch) return httpMatch[0];
-
-  // 2. If no scheme, look for domain-like structure (e.g. vt.tiktok.com/xyz, fb.watch/xyz, facebook.com/...)
   const domainMatch = text.match(/(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s"'<>]*)?/i);
   if (domainMatch) return "https://" + domainMatch[0];
-
   return text;
 }
 
@@ -96,7 +91,6 @@ function updateClearButton() {
 
 input.addEventListener("input", updateClearButton);
 
-// Intercept direct pasting into the text box
 input.addEventListener("paste", () => {
   setTimeout(() => {
     const clean = extractUrl(input.value);
@@ -159,216 +153,177 @@ function parseProxyString(raw) {
     const [authPart, hostPart] = str.split("@");
     const [user, pass] = (authPart || "").split(":");
     const [host, port] = (hostPart || "").split(":");
-    return { proto, host, port, user: decodeURIComponent(user || ""), pass: decodeURIComponent(pass || "") };
+    if (host && port) {
+      return { protocol: proto, host: host.trim(), port: port.trim(), user: user ? user.trim() : "", pass: pass ? pass.trim() : "" };
+    }
   }
   const parts = str.split(":");
-  if (parts.length === 4) {
-    return { proto, host: parts[0], port: parts[1], user: parts[2], pass: parts[3] };
-  }
   if (parts.length === 2) {
-    return { proto, host: parts[0], port: parts[1], user: "", pass: "" };
+    return { protocol: proto, host: parts[0].trim(), port: parts[1].trim(), user: "", pass: "" };
+  }
+  if (parts.length === 4) {
+    return { protocol: proto, host: parts[0].trim(), port: parts[1].trim(), user: parts[2].trim(), pass: parts[3].trim() };
   }
   return null;
 }
 
-function applyParsedProxy(parsed) {
-  if (!parsed || !parsed.host || !parsed.port) return false;
-  if (proxyProtocol) proxyProtocol.value = parsed.proto || "socks5";
-  if (proxyHost) proxyHost.value = parsed.host;
-  if (proxyPort) proxyPort.value = parsed.port;
-  if (proxyUser) proxyUser.value = parsed.user || "";
-  if (proxyPass) proxyPass.value = parsed.pass || "";
-  if (proxyCheckStatus) {
-    proxyCheckStatus.hidden = false;
-    proxyCheckStatus.className = "proxy-check-status loading";
-    proxyCheckStatus.textContent = "Parsed! Click '⚡ Test & Save Proxy' to verify connection.";
+function buildProxyUrl() {
+  const host = proxyHost.value.trim();
+  const port = proxyPort.value.trim();
+  if (!host || !port) return "";
+  const proto = proxyProtocol.value || "socks5";
+  const user = proxyUser.value.trim();
+  const pass = proxyPass.value.trim();
+  let auth = "";
+  if (user) {
+    auth = encodeURIComponent(user) + (pass ? ":" + encodeURIComponent(pass) : "") + "@";
   }
-  return true;
+  return `${proto}://${auth}${host}:${port}`;
+}
+
+function updateProxyStatusBadge() {
+  const saved = localStorage.getItem("vidx_proxy");
+  const meta = JSON.parse(localStorage.getItem("vidx_proxy_meta") || "{}");
+  if (!proxyStatusPill) return;
+
+  if (isProxyEnabled && saved) {
+    const parsed = parseProxyString(saved);
+    const flag = meta.country ? getCountryFlag(meta.country) : "⚡";
+    const loc = meta.country ? ` ${meta.country}` : "";
+    const ping = meta.latency ? ` (${meta.latency})` : "";
+    proxyStatusPill.className = "proxy-pill active";
+    proxyStatusPill.innerHTML = `${flag} Active: <strong>${parsed?.protocol?.toUpperCase() || "PROXY"}</strong> ${parsed?.host}:${parsed?.port}${loc}${ping}`;
+  } else if (!isProxyEnabled && saved) {
+    const parsed = parseProxyString(saved);
+    proxyStatusPill.className = "proxy-pill paused";
+    proxyStatusPill.innerHTML = `⏸ Paused: ${parsed?.protocol?.toUpperCase() || "PROXY"} ${parsed?.host}:${parsed?.port} (Toggle ON to use)`;
+  } else {
+    proxyStatusPill.className = "proxy-pill";
+    proxyStatusPill.textContent = "Direct Connection (No Proxy)";
+  }
+}
+
+function loadSavedProxy() {
+  const saved = localStorage.getItem("vidx_proxy");
+  if (saved) {
+    const parsed = parseProxyString(saved);
+    if (parsed) {
+      if (proxyProtocol) proxyProtocol.value = parsed.protocol;
+      if (proxyHost) proxyHost.value = parsed.host;
+      if (proxyPort) proxyPort.value = parsed.port;
+      if (proxyUser) proxyUser.value = parsed.user || "";
+      if (proxyPass) proxyPass.value = parsed.pass || "";
+    }
+  }
+  updateProxyStatusBadge();
+  updateProxySwitchUI();
+}
+
+function saveProxyConfig(meta = {}) {
+  const url = buildProxyUrl();
+  if (url) {
+    localStorage.setItem("vidx_proxy", url);
+    localStorage.setItem("vidx_proxy_meta", JSON.stringify(meta));
+  } else {
+    localStorage.removeItem("vidx_proxy");
+    localStorage.removeItem("vidx_proxy_meta");
+  }
+  updateProxyStatusBadge();
+  updateProxySwitchUI();
+}
+
+if (proxyToggleSwitch) {
+  proxyToggleSwitch.addEventListener("click", () => {
+    isProxyEnabled = !isProxyEnabled;
+    localStorage.setItem("vidx_proxy_enabled", String(isProxyEnabled));
+    updateProxySwitchUI();
+    updateProxyStatusBadge();
+    const state = isProxyEnabled ? "enabled" : "disabled";
+    showStatus(`Proxy is now ${state.toUpperCase()}.`);
+  });
+}
+
+if (toggleProxyBtn) {
+  toggleProxyBtn.addEventListener("click", () => {
+    const isHidden = proxyPanel.hidden;
+    proxyPanel.hidden = !isHidden;
+    toggleProxyBtn.textContent = isHidden ? "▲ Hide Proxy Settings" : "⚙ Proxy Configuration";
+  });
 }
 
 if (quickProxyInput) {
   quickProxyInput.addEventListener("input", () => {
     const parsed = parseProxyString(quickProxyInput.value);
-    if (parsed) applyParsedProxy(parsed);
+    if (parsed) {
+      proxyProtocol.value = parsed.protocol;
+      proxyHost.value = parsed.host;
+      proxyPort.value = parsed.port;
+      proxyUser.value = parsed.user;
+      proxyPass.value = parsed.pass;
+      proxyCheckStatus.textContent = "Proxy parsed! Tap 'Test & Save Proxy' to activate.";
+      proxyCheckStatus.className = "proxy-check-status";
+    }
   });
 }
 
 if (quickProxyPasteBtn) {
   quickProxyPasteBtn.addEventListener("click", async () => {
     try {
-      if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error();
       const text = await navigator.clipboard.readText();
-      if (text) {
-        if (quickProxyInput) quickProxyInput.value = text.trim();
-        const parsed = parseProxyString(text);
+      if (text && quickProxyInput) {
+        quickProxyInput.value = text.trim();
+        const parsed = parseProxyString(text.trim());
         if (parsed) {
-          applyParsedProxy(parsed);
-          showStatus("Proxy string parsed into fields!");
-        } else {
-          showStatus("Could not auto-parse string. Please enter Host & Port manually.", true);
+          proxyProtocol.value = parsed.protocol;
+          proxyHost.value = parsed.host;
+          proxyPort.value = parsed.port;
+          proxyUser.value = parsed.user;
+          proxyPass.value = parsed.pass;
+          proxyCheckStatus.textContent = "Pasted! Tap 'Test & Save Proxy' to verify.";
+          proxyCheckStatus.className = "proxy-check-status";
         }
       }
     } catch {
-      if (quickProxyInput) quickProxyInput.focus();
-      showStatus("Please tap & hold the input box to Paste.", true);
+      showStatus("Clipboard access denied. Please paste manually into the box.", true);
     }
   });
 }
-
-function buildProxyUrl() {
-  const host = (proxyHost.value || "").trim();
-  const port = (proxyPort.value || "").trim();
-  if (!host || !port) return null;
-
-  const proto = proxyProtocol.value || "socks5";
-  const user = (proxyUser.value || "").trim();
-  const pass = (proxyPass.value || "").trim();
-
-  let auth = "";
-  if (user || pass) {
-    auth = `${encodeURIComponent(user)}:${encodeURIComponent(pass)}@`;
-  }
-
-  return `${proto}://${auth}${host}:${port}`;
-}
-
-function parseAndLoadSavedProxy() {
-  const saved = (localStorage.getItem("vidx_proxy") || "").trim();
-  if (!saved) {
-    if (proxyStatusPill) {
-      proxyStatusPill.className = "proxy-status-pill idle";
-      proxyStatusPill.textContent = "No Proxy";
-    }
-    return;
-  }
-
-  try {
-    const parsed = new URL(saved);
-    const proto = parsed.protocol.replace(":", "");
-    if (proxyProtocol && ["http", "https", "socks5", "socks4"].includes(proto)) {
-      proxyProtocol.value = proto;
-    }
-    if (proxyHost) proxyHost.value = parsed.hostname || "";
-    if (proxyPort) proxyPort.value = parsed.port || "";
-    if (proxyUser) proxyUser.value = decodeURIComponent(parsed.username || "");
-    if (proxyPass) proxyPass.value = decodeURIComponent(parsed.password || "");
-
-    if (proxyStatusPill) {
-      const meta = JSON.parse(localStorage.getItem("vidx_proxy_meta") || "{}");
-      const flag = meta.country ? getCountryFlag(meta.country) + " " : "";
-      proxyStatusPill.className = "proxy-status-pill success";
-      proxyStatusPill.textContent = `${flag}Active`;
-    }
-  } catch {
-    if (proxyHost) proxyHost.value = saved;
-    if (proxyStatusPill) {
-      proxyStatusPill.className = "proxy-status-pill success";
-      proxyStatusPill.textContent = "Saved";
-    }
-  }
-}
-
-parseAndLoadSavedProxy();
-updateProxySwitchUI();
-
-if (proxyToggleSwitch) {
-  proxyToggleSwitch.addEventListener("click", () => {
-    const saved = (localStorage.getItem("vidx_proxy") || "").trim();
-    if (!isProxyEnabled && !saved) {
-      if (proxyPanel) proxyPanel.hidden = false;
-      showStatus("Please configure and test a proxy first.", true);
-      return;
-    }
-    isProxyEnabled = !isProxyEnabled;
-    localStorage.setItem("vidx_proxy_enabled", isProxyEnabled ? "true" : "false");
-    updateProxySwitchUI();
-    showStatus(isProxyEnabled ? "Proxy activated. Blocked sites will route via proxy." : "Proxy turned OFF. Direct connection mode.");
-  });
-}
-
-if (toggleProxyBtn && proxyPanel) {
-  toggleProxyBtn.addEventListener("click", () => {
-    proxyPanel.hidden = !proxyPanel.hidden;
-  });
-}
-
-// Preset Buttons
-document.querySelectorAll(".btn-preset").forEach(btn => {
-  btn.addEventListener("click", () => {
-    if (proxyProtocol) proxyProtocol.value = btn.dataset.proto || "socks5";
-    if (proxyHost) proxyHost.value = btn.dataset.host || "127.0.0.1";
-    if (proxyPort) proxyPort.value = btn.dataset.port || "10808";
-    if (quickProxyInput) quickProxyInput.value = `${btn.dataset.proto || "socks5"}://${btn.dataset.host || "127.0.0.1"}:${btn.dataset.port || "10808"}`;
-    if (proxyCheckStatus) {
-      proxyCheckStatus.hidden = false;
-      proxyCheckStatus.className = "proxy-check-status loading";
-      proxyCheckStatus.textContent = `Preset selected. Click '⚡ Test & Save Proxy' to connect.`;
-    }
-  });
-});
 
 if (checkProxyBtn) {
   checkProxyBtn.addEventListener("click", async () => {
-    const fullProxy = buildProxyUrl();
-    if (!fullProxy) {
-      proxyCheckStatus.hidden = false;
-      proxyCheckStatus.className = "proxy-check-status error";
-      proxyCheckStatus.textContent = "Please enter both Host/IP and Port.";
+    const url = buildProxyUrl();
+    if (!url) {
+      proxyCheckStatus.textContent = "Please fill in Host and Port first.";
+      proxyCheckStatus.className = "proxy-check-status err";
       return;
     }
-
+    proxyCheckStatus.textContent = "Testing proxy latency & public IP...";
+    proxyCheckStatus.className = "proxy-check-status testing";
     checkProxyBtn.disabled = true;
-    checkProxyBtn.querySelector("span").textContent = "Testing Connection…";
-    proxyCheckStatus.hidden = false;
-    proxyCheckStatus.className = "proxy-check-status loading";
-    proxyCheckStatus.textContent = `Connecting to ${fullProxy}… Please wait.`;
 
     try {
       const res = await fetch("/api/check-proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proxy: fullProxy })
+        body: JSON.stringify({ proxy: url })
       });
-
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Proxy connection failed.");
+      if (data.success) {
+        proxyCheckStatus.textContent = `✓ Connected! IP: ${data.ip} | Country: ${data.country || "Unknown"} | Latency: ${data.latency}`;
+        proxyCheckStatus.className = "proxy-check-status ok";
+        isProxyEnabled = true;
+        localStorage.setItem("vidx_proxy_enabled", "true");
+        saveProxyConfig({ ip: data.ip, country: data.country, latency: data.latency });
+        showStatus(`Proxy verified and enabled! (${data.country || "IP: " + data.ip})`);
+      } else {
+        proxyCheckStatus.textContent = `✗ Connection failed: ${data.error}`;
+        proxyCheckStatus.className = "proxy-check-status err";
       }
-
-      const finalProxyUrl = data.workingProxy || fullProxy;
-      localStorage.setItem("vidx_proxy", finalProxyUrl);
-      localStorage.setItem("vidx_proxy_meta", JSON.stringify({
-        ip: data.ip,
-        country: data.country || "",
-        city: data.city || "",
-        latency: data.latency || ""
-      }));
-      isProxyEnabled = true;
-      localStorage.setItem("vidx_proxy_enabled", "true");
-      updateProxySwitchUI();
-
-      const flag = data.country ? getCountryFlag(data.country) + " " : "";
-      const locStr = [data.city, data.country].filter(Boolean).join(", ");
-      const ispStr = data.org ? ` | ${data.org}` : "";
-
-      proxyCheckStatus.className = "proxy-check-status success";
-      proxyCheckStatus.innerHTML = `✅ <strong>Proxy Verified & Active!</strong><br>${flag}${locStr}${ispStr}<br>IP: <code>${data.ip}</code> | Ping: <strong>${data.latency || "OK"}</strong>`;
-      
-      if (proxyStatusPill) {
-        proxyStatusPill.className = "proxy-status-pill success";
-        proxyStatusPill.textContent = `${flag}Connected`;
-      }
-      showStatus("Proxy tested, saved, and activated!");
     } catch (err) {
-      proxyCheckStatus.className = "proxy-check-status error";
-      proxyCheckStatus.textContent = `❌ ${err.message || "Failed to reach proxy."}`;
-      if (proxyStatusPill) {
-        proxyStatusPill.className = "proxy-status-pill error";
-        proxyStatusPill.textContent = "Failed";
-      }
+      proxyCheckStatus.textContent = `✗ Test request failed: ${err.message}`;
+      proxyCheckStatus.className = "proxy-check-status err";
     } finally {
       checkProxyBtn.disabled = false;
-      checkProxyBtn.querySelector("span").textContent = "⚡ Test & Save Proxy";
     }
   });
 }
@@ -380,23 +335,16 @@ if (clearProxyBtn) {
     if (proxyPort) proxyPort.value = "";
     if (proxyUser) proxyUser.value = "";
     if (proxyPass) proxyPass.value = "";
-    localStorage.removeItem("vidx_proxy");
-    localStorage.removeItem("vidx_proxy_meta");
     isProxyEnabled = false;
     localStorage.setItem("vidx_proxy_enabled", "false");
-    updateProxySwitchUI();
-    if (proxyStatusPill) {
-      proxyStatusPill.className = "proxy-status-pill idle";
-      proxyStatusPill.textContent = "No Proxy";
-    }
-    if (proxyCheckStatus) {
-      proxyCheckStatus.hidden = false;
-      proxyCheckStatus.className = "proxy-check-status";
-      proxyCheckStatus.textContent = "Proxy removed.";
-    }
-    showStatus("Proxy cleared.");
+    saveProxyConfig({});
+    proxyCheckStatus.textContent = "Proxy cleared. Operating in Direct Mode.";
+    proxyCheckStatus.className = "proxy-check-status";
+    showStatus("Proxy removed. Connecting directly.");
   });
 }
+
+loadSavedProxy();
 
 // -------------------------------------------------------------
 // Download & Stream URL Generators (Auto-Proxy Aware)
@@ -472,25 +420,32 @@ function playVideo(item, type, title = "Video Preview") {
       }
     });
   } else {
-    // Route via /api/stream proxy to bypass CDN referer, CORS and geo restrictions
+    // Smart Dual-Strategy Video Preview:
     const streamProxyUrl = getStreamUrl(item);
+    let triedDirect = false;
+
+    previewPlayer.onerror = () => {
+      if (!triedDirect && itemUrl && itemUrl !== streamProxyUrl) {
+        triedDirect = true;
+        previewPlayer.src = itemUrl;
+        previewPlayer.play().catch(() => {});
+        return;
+      }
+      if (playerErrorBox) {
+        playerErrorBox.hidden = false;
+        playerErrorBox.innerHTML = `Preview not supported by host. Tap <a href="${getDownloadUrl(item, title)}" style="color:#818cf8;font-weight:600;text-decoration:underline;">Download Video</a> below to watch.`;
+      }
+    };
+
     previewPlayer.src = streamProxyUrl;
     previewPlayer.play().catch(err => {
-      console.warn("Autoplay or stream play prevented:", err);
+      console.warn("Autoplay waiting for user gesture:", err);
     });
   }
 }
 
-if (previewPlayer) {
-  previewPlayer.addEventListener("error", () => {
-    if (playerErrorBox) {
-      playerErrorBox.hidden = false;
-      playerErrorBox.textContent = "This video cannot be played directly in browser due to host/CORS restrictions. Click 'Download Video' below to save the file.";
-    }
-  });
-}
-
 function closeVideoPlayer() {
+  previewPlayer.onerror = null;
   previewPlayer.pause();
   previewPlayer.removeAttribute("src");
   previewPlayer.load();
@@ -511,7 +466,6 @@ document.addEventListener("keydown", event => {
   }
 });
 
-// Ensure player modal is always closed on initial load
 closeVideoPlayer();
 
 // -------------------------------------------------------------
@@ -594,87 +548,4 @@ function createCandidateItem(item, mainTitle) {
     } catch {
       copyBtn.textContent = "Error";
     }
-  });
-  actions.append(copyBtn);
-
-  card.append(meta, actions);
-  return card;
-}
-
-// -------------------------------------------------------------
-// Form Submit Handler
-// -------------------------------------------------------------
-form.addEventListener("submit", async event => {
-  event.preventDefault();
-  const rawUrl = input.value.trim();
-  if (!rawUrl) {
-    showStatus("Please paste or type a video URL first.", true);
-    input.focus();
-    return;
-  }
-
-  const cleanUrl = extractUrl(rawUrl);
-  input.value = cleanUrl;
-  updateClearButton();
-
-  const savedProxy = (localStorage.getItem("vidx_proxy") || "").trim();
-  const shouldUseProxy = isProxyEnabled && Boolean(savedProxy);
-
-  submitBtn.disabled = true;
-  submitBtn.querySelector("span").textContent = "Analyzing…";
-  resultsSec.hidden = true;
-  listContainer.replaceChildren();
-  showStatus(shouldUseProxy ? "Routing via Proxy and extracting video streams..." : "Scanning link and extracting video streams...");
-
-  try {
-    const payload = { url: cleanUrl };
-    if (shouldUseProxy) payload.proxy = savedProxy;
-
-    const response = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to analyze video URL.");
-    }
-
-    pageTitle.textContent = data.title || "Detected Videos";
-    noteText.textContent = data.note || "";
-    countBadge.textContent = `${data.candidates?.length || 0} found`;
-
-    if (data.thumbnail) {
-      videoThumb.src = data.thumbnail;
-      thumbWrap.hidden = false;
-    } else {
-      thumbWrap.hidden = true;
-    }
-
-    if (data.candidates && data.candidates.length > 0) {
-      data.candidates.forEach(item => {
-        listContainer.append(createCandidateItem(item, data.title));
-      });
-    } else {
-      const emptyMsg = document.createElement("div");
-      emptyMsg.className = "note";
-      emptyMsg.style.padding = "20px";
-      emptyMsg.style.textAlign = "center";
-      emptyMsg.textContent = "No direct video streams found. If the site is blocked by your ISP, try toggling Proxy ON above.";
-      listContainer.append(emptyMsg);
-    }
-
-    resultsSec.hidden = false;
-    showStatus("Scan completed successfully!");
-    // Smooth scroll down to results if on mobile
-    if (window.innerWidth < 768) {
-      resultsSec.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  } catch (error) {
-    showStatus(error.message || "An error occurred.", true);
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.querySelector("span").textContent = "Fetch Video";
-  }
-});
+  
