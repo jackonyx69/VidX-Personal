@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "setup:ytdlp": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp",
+    "build": "mkdir -p ./bin && (curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./bin/yt-dlp || true) && chmod +x ./bin/yt-dlp || true",
+    "postinstall": "mkdir -p ./bin && (curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./bin/yt-dlp || true) && chmod +x ./bin/yt-dlp || true",
+    "setup:ytdlp": "mkdir -p ./bin && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./bin/yt-dlp && chmod +x ./bin/yt-dlp",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy"
   },
