@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07090e">
+  <meta name="description" content="VidX - Universal Video & Audio Downloader by Nishad Xaman Orkon.">
+  <title>VidX · Universal Video Downloader</title>
+  <link rel="stylesheet" href="/style.v4.css?v=6.0">
+  <script src="/hls.min.js"></script>
+  <script>
+    function openSettingsPage() {
+      document.body.classList.add("settings-active");
+      var p = document.getElementById("proxyPanel");
+      if (p) {
+        p.removeAttribute("hidden");
+        p.style.display = "block";
+      }
+      var s = document.querySelector(".shell");
+      if (s) {
+        s.style.display = "none";
+      }
+      window.scrollTo(0, 0);
+      try {
+        if (window.location.hash !== "#settings") {
+          history.pushState({ page: "settings" }, "Settings", "#settings");
+        }
+      } catch(e) {}
+    }
+
+    function closeSettingsPage() {
+      document.body.classList.remove("settings-active");
+      var p = document.getElementById("proxyPanel");
+      if (p) {
+        p.style.display = "none";
+      }
+      var s = document.querySelector(".shell");
+      if (s) {
+        s.style.display = "block";
+      }
+      window.scrollTo(0, 0);
+      if (window.location.hash === "#settings") {
+        try {
+          history.back();
+        } catch(e) {
+          window.location.hash = "";
+        }
+      }
+    }
+
+    window.addEventListener("popstate", function() {
+      if (window.location.hash === "#settings") {
+        openSettingsPage();
+      } else {
+        document.body.classList.remove("settings-active");
+        var p = document.getElementById("proxyPanel");
+        if (p) p.style.display = "none";
+        var s = document.querySelector(".shell");
+        if (s) s.style.display = "block";
+      }
+    });
+
+    // Check on initial load if hash is #settings
+    document.addEventListener("DOMContentLoaded", function() {
+      if (window.location.hash === "#settings") {
+        openSettingsPage();
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <!-- Header -->
+    <header class="top">
+      <div class="brand-wrap">
+        <a class="brand" href="/">
+          <span class="brand-icon">⚡</span>
+          <span>VidX</span>
+        </a>
+        <!-- Eye-catching Lead Developer Badge -->
+        <div class="dev-vip-pill" title="Lead Architect & Developer">
+          <span class="dev-crown">👑</span>
+          <span class="dev-label">Dev:</span>
+          <span class="dev-name">Nishad Xaman Orkon</span>
+          <span class="dev-verified" title="Verified Creator">✓</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Proxy Toggle & Settings -->
+        <button id="proxyToggleSwitch" type="button" class="btn-header-proxy" title="Click to toggle Proxy ON or OFF">
+          <span class="proxy-indicator-dot"></span>
+          <span id="proxySwitchText">Proxy: <strong>OFF</strong></span>
+        </button>
+        <button id="toggleProxyBtn" type="button" class="btn-header-proxy" onclick="openSettingsPage()" title="Open Proxy / VPN Settings">
+          <span>⚙️ Settings</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Minimal, Clean Hero Section (No Text Clutter) -->
+      <section class="hero">
+        <h1>Download Any Video</h1>
+        <p class="sub">Fast & clean downloads from TikTok, YouTube, Instagram, Facebook & 100+ sites.</p>
+
+        <!-- Search Bar -->
+        <form id="form" class="search-form" novalidate>
+          <div class="input-wrap">
+            <span class="search-icon">🔗</span>
+            <input id="url" type="text" inputmode="url" placeholder="Paste video link here..." autocomplete="off" spellcheck="false" required autofocus>
+            <div class="input-actions">
+              <button id="clearBtn" type="button" class="btn-clear-url" title="Clear input link" hidden>✕</button>
+              <button id="pasteBtn" type="button" class="btn-paste" title="Paste from clipboard">📋 Paste</button>
+              <button id="submit" type="submit" class="btn-fetch">
+                <span>Download</span>
+                <b>→</b>
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+
+        <!-- Clean Platform Chips -->
+        <div class="platform-chips">
+          <span class="chip tiktok">🎵 TikTok</span>
+          <span class="chip youtube">🔴 YouTube</span>
+          <span class="chip instagram">📸 Instagram</span>
+          <span class="chip facebook">🔵 Facebook</span>
+          <span class="chip twitter">✖️ Twitter / X</span>
+          <span class="chip reddit">🤖 Reddit</span>
+          <span class="chip">🌐 Web Stream</span>
+        </div>
+      </section>
+
+      <!-- Results Section -->
+      <section id="results" class="results" hidden>
+        <div class="result-card-hero">
+          <div class="media-header">
+            <div id="thumbWrap" class="thumb-wrap" hidden>
+              <img id="videoThumb" src="" alt="Thumbnail">
+            </div>
+            <div class="meta-wrap">
+              <div class="eyebrow">FOUND MEDIA</div>
+              <h2 id="pageTitle">Detected Media</h2>
+              <p id="note" class="note"></p>
+              <span id="count" class="count-badge" style="margin-top: 8px;"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Media Category Tabs -->
+        <div class="media-tabs" id="mediaTabs" hidden>
+          <button type="button" class="tab-btn active" data-filter="all">
+            <span>🌐 All Formats</span>
+            <span class="tab-count" id="countAll">0</span>
+          </button>
+          <button type="button" class="tab-btn" data-filter="video">
+            <span>🎬 Videos (MP4)</span>
+            <span class="tab-count" id="countVideo">0</span>
+          </button>
+          <button type="button" class="tab-btn" data-filter="audio">
+            <span>🎵 Audio (MP3)</span>
+            <span class="tab-count" id="countAudio">0</span>
+          </button>
+          <button type="button" class="tab-btn" data-filter="image">
+            <span>🖼️ Images (JPG)</span>
+            <span class="tab-count" id="countImage">0</span>
+          </button>
+        </div>
+
+        <!-- Candidates List -->
+        <div id="list" class="list"></div>
+      </section>
+    </main>
+
+    <!-- Footer with Eye-catching Creator Showcase -->
+    <footer>
+      <div class="footer-content">
+        <div class="creator-vip-card">
+          <span class="crown-big">👑</span>
+          <div class="creator-info">
+            <span class="creator-tag">LEAD DEVELOPER & CREATOR</span>
+            <div class="creator-title">
+              <span>Nishad Xaman Orkon</span>
+              <span class="dev-verified">✓</span>
+            </div>
+            <p class="creator-desc">VidX Universal Downloader · High Speed Core</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Full-Page Dedicated Settings View -->
+  <div id="proxyPanel" class="settings-full-page proxy-panel-backdrop" style="display: none;" hidden>
+    <!-- Top Nav Bar -->
+    <header class="settings-navbar">
+      <button type="button" class="btn-settings-back" id="closeProxyBtn" onclick="closeSettingsPage()" title="Back to Downloader">
+        <span class="back-arrow">←</span>
+        <span>Back to Downloader</span>
+      </button>
+
+      <div class="settings-nav-title">
+        <h3>⚙️ Settings & Network</h3>
+      </div>
+
+      <div class="settings-nav-right">
+        <div class="dev-vip-pill" title="Lead Architect & Developer">
+          <span class="dev-crown">👑</span>
+          <span class="dev-label">Dev:</span>
+          <span class="dev-name">Nishad Xaman Orkon</span>
+          <span class="dev-verified">✓</span>
+        </div>
+        <button type="button" class="btn-close-settings-x" id="closeProxyXBtn" onclick="closeSettingsPage()" title="Close Settings">✕</button>
+      </div>
+    </header>
+
+    <!-- Main Settings Page Body -->
+    <div class="settings-container">
+
+      <!-- Section 1: Network & Proxy Bypass -->
+      <section class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon">🌐</div>
+          <div>
+            <h4>Network & Proxy Bypass</h4>
+            <p>Route requests via SOCKS5/HTTP to bypass ISP blocks on TikTok, YouTube & Facebook</p>
+          </div>
+        </div>
+
+        <div class="settings-section-body">
+          <div class="proxy-form-group">
+            <label for="quickProxyInput">⚡ Quick Import (Paste IP:Port or SOCKS5):</label>
+            <div style="display: flex; gap: 8px;">
+              <input id="quickProxyInput" type="text" placeholder="e.g. 127.0.0.1:10808 or socks5://host:port" autocomplete="off" spellcheck="false">
+              <button id="quickProxyPasteBtn" type="button" class="btn-paste">Paste</button>
+            </div>
+          </div>
+
+          <div class="proxy-grid-2">
+            <div class="proxy-form-group">
+              <label for="proxyProtocol">Protocol</label>
+              <select id="proxyProtocol">
+                <option value="socks5" selected>SOCKS5</option>
+                <option value="http">HTTP</option>
+                <option value="https">HTTPS</option>
+                <option value="socks4">SOCKS4</option>
+              </select>
+            </div>
+            <div class="proxy-form-group">
+              <label for="proxyPort">Port</label>
+              <input id="proxyPort" type="number" placeholder="10808">
+            </div>
+          </div>
+
+          <div class="proxy-form-group">
+            <label for="proxyHost">Host / IP</label>
+            <input id="proxyHost" type="text" placeholder="127.0.0.1 or domain">
+          </div>
+
+          <div class="proxy-grid-2">
+            <div class="proxy-form-group">
+              <label for="proxyUser">Username (Optional)</label>
+              <input id="proxyUser" type="text" placeholder="Username">
+            </div>
+            <div class="proxy-form-group">
+              <label for="proxyPass">Password (Optional)</label>
+              <input id="proxyPass" type="password" placeholder="Password">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 14px;">
+            <button id="checkProxyBtn" type="button" class="btn-dl-primary" style="flex: 2;">
+              <span>⚡ Test & Save</span>
+            </button>
+            <button id="clearProxyBtn" type="button" class="btn-dl-secondary" style="flex: 1;">Remove</button>
+          </div>
+
+          <!-- Quick VPN Presets -->
+          <div style="margin-top: 18px;">
+            <span style="font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">Quick VPN Presets:</span>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+              <button type="button" class="btn-preset" data-proto="socks5" data-host="127.0.0.1" data-port="10808">v2ray (10808)</button>
+              <button type="button" class="btn-preset" data-proto="http" data-host="127.0.0.1" data-port="7890">Clash (7890)</button>
+              <button type="button" class="btn-preset" data-proto="http" data-host="127.0.0.1" data-port="40000">WARP (40000)</button>
+              <button type="button" class="btn-preset" data-proto="http" data-host="127.0.0.1" data-port="8080">Psiphon (8080)</button>
+            </div>
+          </div>
+
+          <div id="proxyCheckStatus" class="proxy-check-status" hidden></div>
+          <span id="proxyStatusPill" hidden></span>
+        </div>
+      </section>
+
+      <!-- Section 2: Engine & Architecture Overview -->
+      <section class="settings-section">
+        <div class="settings-section-header">
+          <div class="settings-section-icon">⚡</div>
+          <div>
+            <h4>Engine & Performance Specs</h4>
+            <p>High speed universal stream processing and failover core</p>
+          </div>
+        </div>
+
+        <div class="settings-section-body">
+          <div class="settings-info-grid">
+            <div class="settings-info-card">
+              <span class="info-label">Supported Platforms</span>
+              <span class="info-val">TikTok, YouTube, Facebook, Insta, X, Web</span>
+            </div>
+            <div class="settings-info-card">
+              <span class="info-label">Stream Technology</span>
+              <span class="info-val">Direct Fast-Stream + Proxy Failover</span>
+            </div>
+            <div class="settings-info-card">
+              <span class="info-label">Max Resolution</span>
+              <span class="info-val">Up to 4K UHD + Original Audio (MP3/M4A)</span>
+            </div>
+            <div class="settings-info-card">
+              <span class="info-label">Version</span>
+              <span class="info-val">VidX Universal v5.3 Ultimate</span>
+            </div>
+          </div>
+
+          <!-- Developer Spotlight in Settings -->
+          <div class="settings-dev-box">
+            <div class="settings-dev-avatar">👑</div>
+            <div class="settings-dev-details">
+              <div class="dev-vip-pill" style="display: inline-flex; margin-bottom: 6px;">
+                <span class="dev-crown">👑</span>
+                <span class="dev-label">Dev:</span>
+                <span class="dev-name">Nishad Xaman Orkon</span>
+                <span class="dev-verified">✓</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--text-dim); margin: 0; line-height: 1.4;">
+                Lead Architect & Senior Developer · VidX Universal Downloader
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Video Player Preview Modal -->
+  <div id="playerModal" class="modal" style="display: none !important;" hidden>
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Video Preview</h3>
+        <button id="closeModal" class="btn-close-modal" aria-label="Close">✕</button>
+      </div>
+      <div id="playerError" class="status error" style="margin: 12px;" hidden></div>
+      <div class="video-container">
+        <video id="previewPlayer" controls playsinline></video>
+      </div>
+      <div class="modal-footer">
+        <a id="modalDownloadBtn" class="btn-dl-primary" href="#" download>📥 Download File</a>
+        <a id="modalExternalBtn" class="btn-dl-secondary" href="#" target="_blank" rel="noopener noreferrer">↗ Open Link</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.v4.js?v=6.0"></script>
+  <script>
+    // Redesigned candidate item card: Clean, modern, high-end consumer look
+    window.createCandidateItem = function(item, mainTitle) {
+      const card = document.createElement("article");
+      card.className = "item-card";
+
+      const category = typeof getCandidateCategory === "function" ? getCandidateCategory(item) : (item.type || "video");
+      const isImage = category === "image";
+      const isAudio = category === "audio";
+      const isBest = item.quality && (item.quality.includes("Best") || item.quality.includes("1080") || item.quality.includes("No Watermark"));
+
+      if (isBest) card.classList.add("featured");
+
+      // Card Top Row (Icon + Quality Title + Pills)
+      const topRow = document.createElement("div");
+      topRow.className = "card-top";
+
+      const titleGroup = document.createElement("div");
+      titleGroup.className = "card-title-group";
+
+      const formatIcon = document.createElement("div");
+      formatIcon.className = "format-icon" + (isAudio ? " audio" : isImage ? " image" : "");
+      formatIcon.textContent = isAudio ? "🎵" : isImage ? "🖼️" : "🎬";
+
+      const textGroup = document.createElement("div");
+      const qualityName = document.createElement("div");
+      qualityName.className = "quality-name";
+      qualityName.textContent = item.quality || (isAudio ? "Audio Stream (MP3)" : isImage ? "Image" : "HD Video (MP4)");
+
+      const sourceName = document.createElement("div");
+      sourceName.className = "source-name";
+      sourceName.textContent = (item.source || "Direct Stream") + (isBest ? " · Recommended" : "");
+
+      textGroup.append(qualityName, sourceName);
+      titleGroup.append(formatIcon, textGroup);
+
+      // Pills Group (Format + Size)
+      const pillsGroup = document.createElement("div");
+      pillsGroup.className = "pills-group";
+
+      const fmtPill = document.createElement("span");
+      fmtPill.className = "pill-badge";
+      fmtPill.textContent = (isImage ? "JPG" : isAudio ? "MP3" : "MP4").toUpperCase();
+      pillsGroup.append(fmtPill);
+
+      if (item.size) {
+        const sizePill = document.createElement("span");
+        sizePill.className = "pill-badge size";
+        sizePill.textContent = item.size;
+        pillsGroup.append(sizePill);
+      }
+
+      topRow.append(titleGroup, pillsGroup);
+
+      // Card Bottom Row (Actions: Download, Preview, Copy)
+      const bottomActions = document.createElement("div");
+      bottomActions.className = "card-bottom-actions";
+
+      // 1. Download Link
+      const dlBtn = document.createElement("a");
+      dlBtn.className = "btn-dl-primary";
+      dlBtn.href = typeof getDownloadUrl === "function" ? getDownloadUrl(item, mainTitle) : ("/api/download?url=" + encodeURIComponent(item.url || ""));
+      const ext = isImage ? ".jpg" : isAudio ? ".mp3" : ".mp4";
+      const safeTitle = (mainTitle || (isImage ? "image" : isAudio ? "audio" : "video")).replace(/[\\/:*?"<>|]/g, "_").slice(0, 50);
+      dlBtn.setAttribute("download", safeTitle + ext);
+      dlBtn.innerHTML = `<span>📥 Download</span> <b>${isAudio ? "MP3" : "MP4"}</b>`;
+      bottomActions.append(dlBtn);
+
+      // 2. Preview Button
+      if (isImage) {
+        const viewBtn = document.createElement("a");
+        viewBtn.className = "btn-dl-secondary";
+        viewBtn.href = item.url;
+        viewBtn.target = "_blank";
+        viewBtn.rel = "noopener noreferrer";
+        viewBtn.textContent = "👁 View";
+        bottomActions.append(viewBtn);
+      } else {
+        const prevBtn = document.createElement("button");
+        prevBtn.type = "button";
+        prevBtn.className = "btn-dl-secondary";
+        prevBtn.textContent = isAudio ? "▶ Play" : "▶ Preview";
+        prevBtn.addEventListener("click", () => {
+          if (typeof playVideo === "function") playVideo(item, item.type, mainTitle);
+        });
+        bottomActions.append(prevBtn);
+      }
+
+      // 3. Copy Stream Link Button
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "btn-dl-secondary";
+      copyBtn.textContent = "🔗 Copy";
+      copyBtn.title = "Copy direct stream link";
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(item.url);
+          copyBtn.textContent = "✓ Copied";
+          setTimeout(() => { copyBtn.textContent = "🔗 Copy"; }, 2000);
+        } catch {
+          copyBtn.textContent = "Error";
+        }
+      });
+      bottomActions.append(copyBtn);
+
+      card.append(topRow, bottomActions);
+      return card;
+    };
+  </script>
+</body>
+</html>
